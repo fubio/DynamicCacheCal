@@ -170,11 +170,12 @@ fn main() {
     let (over_alloc, trace_len, forced_evictions, FE_remaining_dist) = caching(Sampler::new(data.into_iter()), 10, 0.05);
 
     println!(
-        "over_alloc: {}, trace_len: {}, div : {}, forced_evictions : {}, \nFE_remaining_dist : {:#?}",
+        "over_alloc: {},\ntrace_len: {},\ndiv : {},\nforced_evictions : {},\nFE_remaining_dist : {:#?},\nE[FE_remaining_dist]: {}",
         over_alloc,
         trace_len,
         over_alloc as f64 / trace_len as f64,
         forced_evictions,
         FE_remaining_dist,
+        FE_remaining_dist.iter().map(|(key, value)| *key as f64 * *value).sum::<f64>()
     );
 }
