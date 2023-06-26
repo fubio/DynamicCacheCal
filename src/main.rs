@@ -116,6 +116,12 @@ impl Simulator {
         self.FERemainingTracker.insert(keyToDecrement - self.step, self.FERemainingTracker.get(&(keyToDecrement- self.step)).unwrap_or(&0) + 1);
     }
 
+    fn normalize_map(&mut self) -> Vec<(u64, f64)> {
+        // println!("FE remaining {:#?}", self.FERemainingTracker);
+        let total_FE_remaining: u64 = self.FERemainingTracker.iter().map(|(_, value)| *value).sum();
+        self.FERemainingTracker.iter().map(|(key, value)| (*key, *value as f64 / total_FE_remaining as f64)).collect()
+    }
+
     fn get_excess(&self, fixed: u64) -> u64 {
         if self.VCS <= fixed {
             0
@@ -129,7 +135,7 @@ impl Simulator {
     }
 }
 
-fn caching(ten_dist: Sampler, cache_size: u64, delta: f64) -> (u64, u64, u64, HashMap<u64, u64>) {
+fn caching(ten_dist: Sampler, cache_size: u64, delta: f64) -> (u64, u64, u64, Vec<(u64, f64)>) {
     let mut cache = Simulator::init();
     let mut trace_len: u64 = 0;
     let mut samples_to_issue: u64 = 1024;
@@ -145,7 +151,7 @@ fn caching(ten_dist: Sampler, cache_size: u64, delta: f64) -> (u64, u64, u64, Ha
         if prev_output.is_some()
             && ((total_overalloc as f64) / (trace_len as f64) - prev_output.unwrap()) < delta
         {
-            return (total_overalloc, trace_len, cache.force_evictions, cache.FERemainingTracker.clone());
+            return (total_overalloc, trace_len, cache.force_evictions, cache.normalize_map());
         }
         prev_output = Some((total_overalloc as f64) / (trace_len as f64));
         samples_to_issue *= 2;
