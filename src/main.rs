@@ -96,12 +96,12 @@ impl Simulator {
 
     fn update(&mut self, fixed: u64) {
         self.step += 1;
+        self.VCS -= self.VCExpiringBlockTracker.remove(&self.step).unwrap_or(0);
         let numPCExpiring = self.PCExpiringBlockTracker.remove(&self.step).unwrap_or(0);
         // print!("num expiring {:#?}  PCS {:#?} ", numPCExpiring, self.PCS);
-        self.VCS -= self.VCExpiringBlockTracker.remove(&self.step).unwrap_or(0);
         self.PCS -= numPCExpiring;
         //FE needed if one block doesn't expire since there is a new tenancy added at every step also must need PCS < than the cache size
-        if numPCExpiring < 1 && self.PCS > fixed {
+        if numPCExpiring < 1 && self.PCS == fixed {
             // println!("force exicting\n");
             self.force_evcit();
             self.force_evictions += 1;
@@ -135,10 +135,14 @@ impl Simulator {
     }
 }
 
+fn expectation(mut vec: Vec<(u64, f64)>) -> f64 {
+    vec.iter().map(|(key, value)| *key as f64 * *value).sum::<f64>()
+}
+
 fn caching(ten_dist: Sampler, cache_size: u64, delta: f64) -> (u64, u64, u64, Vec<(u64, f64)>) {
     let mut cache = Simulator::init();
     let mut trace_len: u64 = 0;
-    let mut samples_to_issue: u64 = 1024;
+    let mut samples_to_issue: u64 = 1024*64;
     let mut prev_output: Option<f64> = None;
     let mut total_overalloc: u64 = 0;
     loop {
@@ -148,26 +152,30 @@ fn caching(ten_dist: Sampler, cache_size: u64, delta: f64) -> (u64, u64, u64, Ve
             cache.add_tenancy(tenancy, cache_size);
             total_overalloc += cache.get_excess(cache_size);
         }
+        // if prev_output.is_some()
+        //     && ((total_overalloc as f64) / (trace_len as f64) - prev_output.unwrap()) < delta
+        // {
         if prev_output.is_some()
-            && ((total_overalloc as f64) / (trace_len as f64) - prev_output.unwrap()) < delta
+            && expectation(cache.normalize_map()) - prev_output.unwrap() < delta
         {
             return (total_overalloc, trace_len, cache.force_evictions, cache.normalize_map());
         }
-        prev_output = Some((total_overalloc as f64) / (trace_len as f64));
+        // prev_output = Some((total_overalloc as f64) / (trace_len as f64));
+        prev_output = Some(expectation(cache.normalize_map()));
         samples_to_issue *= 2;
     }
 }
 
 fn main() {
     let data = vec![
-        (1, 0.333),
-        (5, 0.333),
-        (15, 0.333),
+        (1, 0.3333),
+        (5, 0.3333),
+        (150, 0.333),
     ];
     // let x = vec![1, 2, 3];
     // let y = vec![1.0, 2.0, 3.0];
     // let iterator = x.into_iter().zip(y.into_iter());
-    let (over_alloc, trace_len, forced_evictions, FE_remaining_dist) = caching(Sampler::new(data.into_iter()), 10, 0.05);
+    let (over_alloc, trace_len, forced_evictions, FE_remaining_dist) = caching(Sampler::new(data.into_iter()), 10, 0.00000001);
 
     println!(
         "over_alloc: {},\ntrace_len: {},\ndiv : {},\nforced_evictions : {:#?},\nE[FE_remaining_dist]: {}",
